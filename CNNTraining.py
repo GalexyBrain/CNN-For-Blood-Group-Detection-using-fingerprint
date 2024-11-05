@@ -52,16 +52,21 @@ validation_generator = train_datagen.flow_from_directory(
 def build_model():
     model = Sequential()
     model.add(layers.Conv2D(32, (11, 11), activation='relu', input_shape=(img_width, img_height, 1)))  # Grayscale images
+    model.add(layers.BatchNormalization())
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(64, (5, 5), activation='relu'))
+    model.add(layers.BatchNormalization())
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+    model.add(layers.BatchNormalization())
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(128, (3, 3), activation='relu'))
+    model.add(layers.BatchNormalization())
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Flatten())
     model.add(layers.Dense(512, activation='relu'))
     model.add(layers.Dropout(0.5))
+    model.add(layers.BatchNormalization())
     model.add(layers.Dense(num_classes, activation='softmax'))
     return model
 
@@ -79,9 +84,9 @@ model.compile(optimizer=Adam(learning_rate=0.0001),
               metrics=['accuracy'])
 
 # Callbacks for saving the model and managing training
-checkpoint = ModelCheckpoint(model_path, save_best_only=True, monitor='val_accuracy', mode='max')
-early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6)
+checkpoint = ModelCheckpoint(model_path, save_best_only=True, monitor='val_accuracy', mode='max', verbose=1)
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=1)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6, verbose=1)
 
 # Training function with time limit (1 hour at a time)
 def train_with_time_limit():
