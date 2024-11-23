@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Group Detection</title>
+    <link rel="stylesheet" href="one.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Blood Group Detection</h1>
+            <!-- <p>AI-Based Detection of Your Blood Group from Fingerprint</p> -->
+        </div>
+    </header>
+    <main>
+        <div class="container">
+            <div class="form-wrapper">
+                <h2>Upload Your Fingerprint Image</h2>
+                <form id="uploadForm">
+                    <div class="input-group">
+                        <label for="fileInput">
+                            <i class="fas fa-upload"></i> Select a file
+                        </label>
+                        <input type="file" id="fileInput" name="file" accept="image/*" required>
+                    </div>
+                    <button type="submit">Detect Blood Group</button>
+                    <p class="error" id="error"></p>
+                </form>
+            </div>
+            <div class="result" id="result">
+                <h3>Result</h3>
+                <p id="bloodGroup"></p>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <!-- <p>&copy; 2024 Blood Group Detection | Powered by AI</p> -->
+    </footer>
+    <script src="one.js"></script>
+</body>
+</html>
