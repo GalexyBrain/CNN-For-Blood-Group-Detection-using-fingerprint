@@ -22,10 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault(); // Prevent default form submission
 
-        // Clear previous error messages and keep the result section visible
+        // Clear previous error messages
         errorElement.textContent = '';
-        bloodGroupElement.textContent = '';
-        resultElement.style.display = 'none';
+        uploadStatus.textContent = '';
 
         // Validate file input
         if (!fileInput.files.length) {
@@ -57,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadStatus.style.color = 'green';
 
                 bloodGroupElement.textContent = `Your Blood Group: ${data.blood_group}`;
-                resultElement.style.display = 'block';
+                resultElement.style.display = 'block'; // Ensure result is displayed
             } else {
                 // Handle server errors
                 throw new Error(data.error || 'Failed to detect blood group.');
@@ -68,5 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
             uploadStatus.style.color = 'red';
             errorElement.textContent = `Error: ${error.message}`;
         }
+    });
+
+    // Prevent the result section from hiding automatically
+    resultElement.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent unintended hiding of the result
     });
 });
