@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blood Group Detection</title>
+    <link rel="stylesheet" href="three.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Blood Group Detection</h1>
+            <p>Upload your fingerprint image below to detect your blood group.</p>
+
+            <form id="uploadForm">
+                <label for="fileInput" class="custom-file-input">Choose Image</label>
+                <input type="file" id="fileInput" accept="image/*" required>
+                <button type="submit">Upload and Detect</button>
+            </form>
+
+            <div id="result" class="hidden">
+                <h2>Detected Blood Group</h2>
+                <p id="bloodGroup"></p>
+            </div>
+
+            <div id="error" class="hidden">
+                <h2>Error</h2>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <p>&copy; 2024 Blood Group Detection System</p>
+    </footer>
+    <script src="three.js"></script>
+</body>
+</html>
