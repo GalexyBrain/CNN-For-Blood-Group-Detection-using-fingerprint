@@ -1,119 +1,118 @@
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import load_model, Sequential
-from tensorflow.keras import layers, models
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.optimizers import Adam
-import os
-import time
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, CSVLogger
+import matplotlib.pyplot as plt
 
 # Directory paths
 data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\dataset_blood_group'
-model_path = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\savedModel.keras'  # Replace with your model's path
+model_path = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\savedModel.keras'
+validation_data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\ValidationData'
 
-# Updated image dimensions and settings
-img_width, img_height = 96, 103
-batch_size = 32
-num_classes = 8  # 8 blood group classes (A+, A-, B+, B-, AB+, AB-, O+, O-)
-target_epochs = 50  # Total number of epochs you want to train
+# Image dimensions and settings
+IMG_WIDTH = 96   # Corrected to 96 (Width)
+IMG_HEIGHT = 103  # Corrected to 103 (Height)
+BATCH_SIZE = 32
+target_epochs = 50
 
-# Set up data augmentation and automatic train/test split
+# Initialize data generators
 train_datagen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=30,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
     horizontal_flip=True,
-    validation_split=0.2  # 20% of data for validation
+    validation_split=0.2  # 20% for validation split
 )
 
-# Creating training and validation generators
 train_generator = train_datagen.flow_from_directory(
     data_dir,
-    target_size=(img_width, img_height),
-    batch_size=batch_size,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),  # Corrected order: Height x Width
+    batch_size=BATCH_SIZE,
     class_mode='categorical',
-    subset='training',  # Train set
-    color_mode='grayscale'  # Load images in grayscale for .bmp format
+    shuffle=True,
+    color_mode='rgb'  # Ensure RGB images for training
 )
 
-validation_generator = train_datagen.flow_from_directory(
-    data_dir,
-    target_size=(img_width, img_height),
-    batch_size=batch_size,
+class_names = list(train_generator.class_indices.keys())
+num_classes = len(class_names)  # Dynamically set num_classes based on detected classes
+print(f"Detected classes: {class_names}")
+
+train_dataset = tf.data.Dataset.from_generator(
+    lambda: train_generator,
+    output_signature=(
+        tf.TensorSpec(shape=(None, IMG_HEIGHT, IMG_WIDTH, 3), dtype=tf.float32),
+        tf.TensorSpec(shape=(None, num_classes), dtype=tf.float32)
+    )
+).repeat()
+
+validation_datagen = ImageDataGenerator(rescale=1./255)
+
+validation_generator = validation_datagen.flow_from_directory(
+    validation_data_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
     class_mode='categorical',
-    subset='validation',  # Validation set
-    color_mode='grayscale'  # Load images in grayscale for .bmp format
+    shuffle=False,
+    color_mode='rgb'
 )
 
-# Build the model (if not loaded from a checkpoint)
-def build_model():
-    model = Sequential()
-    model.add(layers.Conv2D(32, (11, 11), activation='relu', input_shape=(img_width, img_height, 1)))  # Grayscale images
-    model.add(layers.BatchNormalization())
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(64, (5, 5), activation='relu'))
-    model.add(layers.BatchNormalization())
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(128, (3, 3), activation='relu'))
-    model.add(layers.BatchNormalization())
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Conv2D(128, (3, 3), activation='relu'))
-    model.add(layers.BatchNormalization())
-    model.add(layers.MaxPooling2D((2, 2)))
-    model.add(layers.Flatten())
-    model.add(layers.Dense(512, activation='relu'))
-    model.add(layers.Dropout(0.5))
-    model.add(layers.BatchNormalization())
-    model.add(layers.Dense(num_classes, activation='softmax'))
+validation_dataset = tf.data.Dataset.from_generator(
+    lambda: validation_generator,
+    output_signature=(
+        tf.TensorSpec(shape=(None, IMG_HEIGHT, IMG_WIDTH, 3), dtype=tf.float32),
+        tf.TensorSpec(shape=(None, num_classes), dtype=tf.float32)
+    )
+)
+
+# Build or load the model
+def create_high_accuracy_model():
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(128, (5, 5), activation='relu'),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Conv2D(256, (7, 7), activation='relu'),
+        tf.keras.layers.MaxPooling2D(2, 2),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(512, activation='relu'),
+        tf.keras.layers.Dropout(0.5),  # Regularization to prevent overfitting
+        tf.keras.layers.Dense(num_classes, activation='softmax')  # Dynamically use num_classes
+    ])
+
+    model.compile(optimizer='adam',
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
     return model
 
-# Load or build the model
-if os.path.exists(model_path):
-    model = load_model(model_path)
-    print("Loaded model from checkpoint.")
-else:
-    model = build_model()
-    print("Initialized a new model.")
+# Create the model
+high_acc_model = create_high_accuracy_model()
 
-# Compile the model
-model.compile(optimizer=Adam(learning_rate=0.0001),
-              loss='categorical_crossentropy',
-              metrics=['accuracy'])
+# Callbacks
+checkpoint = ModelCheckpoint(model_path, save_best_only=True, monitor='val_accuracy', mode='max')
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.25, patience=3, min_lr=1e-6)
+csv_logger = CSVLogger('training_log.csv', append=True)
 
-# Callbacks for saving the model and managing training
-checkpoint = ModelCheckpoint(model_path, save_best_only=True, monitor='val_accuracy', mode='max', verbose=1)
-early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=1)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6, verbose=1)
-
-# Training function with time limit (1 hour at a time)
-def train_with_time_limit():
-    start_time = time.time()
-    elapsed_time = 0
-    current_epoch = 0
-    while current_epoch < target_epochs:
-        # Fit the model for the next epoch
-        history = model.fit(
-            train_generator,
-            steps_per_epoch=train_generator.samples // batch_size,
-            epochs=current_epoch + 1,
-            initial_epoch=current_epoch,
-            validation_data=validation_generator,
-            validation_steps=validation_generator.samples // batch_size,
-            callbacks=[checkpoint, reduce_lr, early_stopping],
-            verbose=1
+# Train and capture history
+def train_and_plot():
+    try:
+        history_high_acc = high_acc_model.fit(
+            train_dataset,
+            validation_data=validation_dataset,
+            epochs=target_epochs,
+            steps_per_epoch=train_generator.samples // BATCH_SIZE,
+            validation_steps=validation_generator.samples // BATCH_SIZE,
+            callbacks=[early_stopping, reduce_lr, checkpoint, csv_logger]
         )
-        current_epoch += 1
-        elapsed_time = time.time() - start_time  # Update elapsed time
-        print(f"Completed epoch {current_epoch}/{target_epochs}. Elapsed time: {elapsed_time:.2f} seconds.")
+        
+        high_acc_eval = high_acc_model.evaluate(validation_generator)
+        print(f"High Accuracy Model - Loss: {high_acc_eval[0]}, Accuracy: {high_acc_eval[1]}")
+    
+    except KeyboardInterrupt:
+        print("Training interrupted by user.")
+    
+    finally:
+        print("Saving the model...")
+        high_acc_model.save(model_path)
+        print(f"Model saved at {model_path}. Exiting.")
 
-        # Check if 1 hour has passed
-        if elapsed_time >= 3600:
-            print("1 hour of training completed. Saving the model...")
-            model.save(model_path)  # Save the model
-            break
-
-# Run training with checkpointing every hour
-train_with_time_limit()
+train_and_plot()
