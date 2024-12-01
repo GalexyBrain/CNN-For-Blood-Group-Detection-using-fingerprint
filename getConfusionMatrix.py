@@ -1,58 +1,84 @@
 import tensorflow as tf
-import numpy as np
-from tensorflow.keras.utils import image_dataset_from_directory
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import numpy as np
 import matplotlib.pyplot as plt
 
-# Paths
+# Directory paths
 data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\dataset_blood_group'
 model_path = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\savedModel.keras'
+test_data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\ValidationData'
 
-# Load the model
+# Image dimensions and batch size
+IMG_WIDTH = 96
+IMG_HEIGHT = 103
+BATCH_SIZE = 32
+
+# Load the trained model
 model = tf.keras.models.load_model(model_path)
+print("Model loaded successfully.")
 
-# Load the dataset
-batch_size = 32  # Adjust as per your hardware capabilities
-img_size = (96, 103)  # Match image dimensions in the dataset
+# Initialize data generator for evaluation
+test_datagen = ImageDataGenerator(rescale=1.0 / 255)
 
-# Create dataset and extract class names
-raw_test_dataset = image_dataset_from_directory(
+# Prepare the data generator for test data
+test_generator = test_datagen.flow_from_directory(
     data_dir,
-    labels="inferred",
-    label_mode="int",
-    image_size=img_size,
-    batch_size=batch_size,
-    shuffle=False  # Keep order for accurate label matching
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    shuffle=False,  # Preserve order for correct predictions
+    color_mode='rgb'
 )
 
-# Save class names (should be ['A+', 'A-', 'AB+', 'AB-', 'B+', 'B-', 'O+', 'O-'])
-class_names = raw_test_dataset.class_names
-print(f"Class names: {class_names}")
+# Get true labels for validation data
+true_labels = test_generator.classes
+class_names = list(test_generator.class_indices.keys())
 
-# Convert to grayscale and normalize
-def convert_to_grayscale(images, labels):
-    """Converts images to grayscale."""
-    grayscale_images = tf.image.rgb_to_grayscale(images)
-    return grayscale_images, labels
-
-test_dataset = raw_test_dataset
-normalization_layer = tf.keras.layers.Rescaling(1.0 / 255)
-test_dataset = test_dataset.map(lambda x, y: (normalization_layer(x), y))
-
-# Get true labels and predictions
-true_labels = np.concatenate([y.numpy() for _, y in test_dataset])
-predictions = model.predict(test_dataset)
+# Predict the probabilities for all validation images
+predictions = model.predict(test_generator, steps=test_generator.samples // BATCH_SIZE + 1)
 predicted_labels = np.argmax(predictions, axis=1)
 
-# Generate confusion matrix
-cm = confusion_matrix(true_labels, predicted_labels, labels=range(len(class_names)))
+# Generate the confusion matrix for validation data
+conf_matrix_validation = confusion_matrix(true_labels, predicted_labels)
 
-# Save the confusion matrix to a file
-output_path = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\confusion_matrix.png'
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names)
-disp.plot(cmap=plt.cm.Blues)
-plt.title('Confusion Matrix for Blood Group Detection')
-plt.savefig(output_path)
-plt.close()
+# Now, prepare the generator for test data (if you have separate test data)
+test_generator_test = test_datagen.flow_from_directory(
+    test_data_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    shuffle=False,  # Preserve order for correct predictions
+    color_mode='rgb'
+)
 
-print(f"Confusion matrix saved to {output_path}")
+# Get true labels for test data
+true_labels_test = test_generator_test.classes
+
+# Predict the probabilities for all test images
+predictions_test = model.predict(test_generator_test, steps=test_generator_test.samples // BATCH_SIZE + 1)
+predicted_labels_test = np.argmax(predictions_test, axis=1)
+
+# Generate the confusion matrix for test data
+conf_matrix_test = confusion_matrix(true_labels_test, predicted_labels_test)
+
+# Plot confusion matrices side by side
+fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+
+# Confusion matrix for validation data
+disp_validation = ConfusionMatrixDisplay(confusion_matrix=conf_matrix_validation, display_labels=class_names)
+disp_validation.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=axes[0])
+axes[0].set_title("Validation Data Confusion Matrix")
+
+# Confusion matrix for test data
+disp_test = ConfusionMatrixDisplay(confusion_matrix=conf_matrix_test, display_labels=class_names)
+disp_test.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=axes[1])
+axes[1].set_title("Test Data Confusion Matrix")
+
+# Save the combined confusion matrix image
+conf_matrix_path = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\confusion_matrix.png'
+plt.tight_layout()
+plt.savefig(conf_matrix_path)
+print(f"Confusion matrix saved at {conf_matrix_path}")
+
+plt.show()

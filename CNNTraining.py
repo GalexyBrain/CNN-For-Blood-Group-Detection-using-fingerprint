@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # Directory paths
 data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\dataset_blood_group'
 model_path = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\savedModel.keras'
-validation_data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\ValidationData'
+test_data_dir = r'C:\Users\USER\Desktop\Stuff\Code\BloodGroupDetection\ValidationData'
 
 # Image dimensions and settings
 IMG_WIDTH = 96   # Corrected to 96 (Width)
@@ -16,9 +16,8 @@ target_epochs = 50
 
 # Initialize data generators
 train_datagen = ImageDataGenerator(
-    rescale=1./255,
-    horizontal_flip=True,
-    validation_split=0.2  # 20% for validation split
+    rescale=1.0 / 255,
+    validation_split=0.1  # 10% for validation split
 )
 
 train_generator = train_datagen.flow_from_directory(
@@ -27,7 +26,18 @@ train_generator = train_datagen.flow_from_directory(
     batch_size=BATCH_SIZE,
     class_mode='categorical',
     shuffle=True,
-    color_mode='rgb'  # Ensure RGB images for training
+    color_mode='rgb',  # Ensure RGB images for training
+    subset='training'  # Training subset
+)
+
+validation_generator = train_datagen.flow_from_directory(
+    data_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),  # Corrected order: Height x Width
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    shuffle=False,
+    color_mode='rgb',
+    subset='validation'  # Validation subset
 )
 
 class_names = list(train_generator.class_indices.keys())
@@ -42,23 +52,24 @@ train_dataset = tf.data.Dataset.from_generator(
     )
 ).repeat()
 
-validation_datagen = ImageDataGenerator(rescale=1./255)
-
-validation_generator = validation_datagen.flow_from_directory(
-    validation_data_dir,
-    target_size=(IMG_HEIGHT, IMG_WIDTH),
-    batch_size=BATCH_SIZE,
-    class_mode='categorical',
-    shuffle=False,
-    color_mode='rgb'
-)
-
 validation_dataset = tf.data.Dataset.from_generator(
     lambda: validation_generator,
     output_signature=(
         tf.TensorSpec(shape=(None, IMG_HEIGHT, IMG_WIDTH, 3), dtype=tf.float32),
         tf.TensorSpec(shape=(None, num_classes), dtype=tf.float32)
     )
+)
+
+# Test data generator
+test_datagen = ImageDataGenerator(rescale=1.0 / 255)
+
+test_generator = test_datagen.flow_from_directory(
+    test_data_dir,
+    target_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical',
+    shuffle=False,
+    color_mode='rgb'
 )
 
 # Build or load the model
@@ -88,8 +99,8 @@ high_acc_model = create_high_accuracy_model()
 
 # Callbacks
 checkpoint = ModelCheckpoint(model_path, save_best_only=True, monitor='val_accuracy', mode='max')
-early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.25, patience=3, min_lr=1e-6)
+early_stopping = EarlyStopping(monitor='val_loss', patience=7, restore_best_weights=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6)
 csv_logger = CSVLogger('training_log.csv', append=True)
 
 # Train and capture history
@@ -103,14 +114,15 @@ def train_and_plot():
             validation_steps=validation_generator.samples // BATCH_SIZE,
             callbacks=[early_stopping, reduce_lr, checkpoint, csv_logger]
         )
-        
-        high_acc_eval = high_acc_model.evaluate(validation_generator)
-        print(f"High Accuracy Model - Loss: {high_acc_eval[0]}, Accuracy: {high_acc_eval[1]}")
     
+
     except KeyboardInterrupt:
         print("Training interrupted by user.")
     
     finally:
+        print("\nEvaluating the model on the test dataset...")
+        test_eval = high_acc_model.evaluate(test_generator)
+        print(f"Test Dataset Evaluation - Loss: {test_eval[0]}, Accuracy: {test_eval[1]}")
         print("Saving the model...")
         high_acc_model.save(model_path)
         print(f"Model saved at {model_path}. Exiting.")
